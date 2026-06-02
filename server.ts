@@ -34,7 +34,9 @@ let dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.
 if (!dbUrl && process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD) {
   const port = process.env.DB_PORT || '5432';
   const name = process.env.DB_NAME || 'postgres';
-  dbUrl = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${port}/${name}`;
+  const encodedUser = encodeURIComponent(process.env.DB_USER);
+  const encodedPassword = encodeURIComponent(process.env.DB_PASSWORD);
+  dbUrl = `postgresql://${encodedUser}:${encodedPassword}@${process.env.DB_HOST}:${port}/${name}`;
   console.log('  - Constructed Database URL automatically from DB_ variables!');
 }
 
