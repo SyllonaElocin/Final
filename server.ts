@@ -158,19 +158,26 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// File Upload endpoint (simulated Cloudinary fallback)
 app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  console.log('[Upload Endpoint] Request received');
+  if (!req.file) {
+    console.log('[Upload Endpoint] No file uploaded');
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
   
+  console.log(`[Upload Endpoint] File received: ${req.file.originalname} (${req.file.size} bytes)`);
+
   const hasCloudinaryUrl = process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.startsWith('cloudinary://');
   const hasCloudinaryKeys = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
 
   if (hasCloudinaryUrl || hasCloudinaryKeys) {
+    console.log('[Upload Endpoint] Cloudinary credentials detected. Starting Cloudinary upload...');
     const ext = path.extname(req.file.originalname);
     const tempPath = req.file.path + ext;
     try {
       // Rename file locally to preserve original extension for Cloudinary to detect properly
       fs.renameSync(req.file.path, tempPath);
+      console.log(`[Upload Endpoint] Renamed file to temporary path: ${tempPath}`);
 
       const cloudinary = (await import('cloudinary')).v2;
       if (hasCloudinaryKeys) {
@@ -184,24 +191,27 @@ app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
         cloudinary.config({ secure: true });
       }
 
-      // Determine correct resource type: 'image' for images and PDFs (so Cloudinary serves them as application/pdf), 'raw' for datasets (CSV, ZIP, etc.)
+      // Determine correct resource type: 'image' for images and PDFs, 'raw' for datasets (CSV, ZIP, etc.)
       const isImageOrPdf = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'].includes(ext.toLowerCase());
       const resourceType = isImageOrPdf ? 'image' : 'raw';
+      console.log(`[Upload Endpoint] Detected resource type for Cloudinary: ${resourceType}`);
 
       const result = await cloudinary.uploader.upload(tempPath, {
         resource_type: resourceType
       });
 
+      console.log('[Upload Endpoint] Cloudinary upload successful:', result.secure_url);
       fs.unlinkSync(tempPath); // cleanup local
       return res.json({ url: result.secure_url });
     } catch (e: any) {
-      console.error('Cloudinary Upload Error:', e);
+      console.error('[Upload Endpoint] Cloudinary Upload Error:', e);
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
       return res.status(500).json({ error: 'Cloudinary upload failed: ' + e.message });
     }
   }
 
   // Fallback: return local path simulation setup
+  console.log('[Upload Endpoint] No Cloudinary credentials found. Falling back to local file storage.');
   const url = `/api/files/${req.file.filename}`;
   res.json({ url });
 });
@@ -293,7 +303,13 @@ app.post('/api/publications', async (req: any, res: any) => {
 
 
 async function startServer() {
-  await initDb();
+  try {
+    console.log('[Server Startup] Initializing Database...');
+    await initDb();
+    console.log('[Server Startup] Database initialized successfully.');
+  } catch (dbErr) {
+    console.error('[Server Startup] Database initialization failed. Check your DATABASE_URL credentials:', dbErr);
+  }
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
