@@ -23,11 +23,21 @@ console.log('[Server Startup] Scanning Environment Variables for Database Config
 console.log('  - DATABASE_URL present:', !!process.env.DATABASE_URL);
 console.log('  - POSTGRES_URL present:', !!process.env.POSTGRES_URL);
 console.log('  - PGURL present:', !!process.env.PGURL);
-console.log('  - Found related Keys:', Object.keys(process.env).filter(k => 
+const envKeys = Object.keys(process.env).filter(k => 
   k.includes('DB') || k.includes('URL') || k.includes('POSTGRES') || k.includes('PG')
-));
+);
+console.log('  - Found related Keys:', envKeys);
 
-const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURL;
+let dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURL;
+
+// If individual DB variables are provided instead of a full URL, construct the URL automatically
+if (!dbUrl && process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD) {
+  const port = process.env.DB_PORT || '5432';
+  const name = process.env.DB_NAME || 'postgres';
+  dbUrl = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${port}/${name}`;
+  console.log('  - Constructed Database URL automatically from DB_ variables!');
+}
+
 const useSupabase = !!dbUrl;
 
 if (useSupabase) {
