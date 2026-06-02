@@ -364,7 +364,10 @@ function PublicationForm({ token, onSuccess }: { token: string, onSuccess: () =>
       headers: { Authorization: `Bearer ${token}` },
       body: formData
     });
-    if (!res.ok) throw new Error('Upload failed');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Upload failed');
+    }
     const data = await res.json();
     return data.url;
   };
@@ -399,8 +402,8 @@ function PublicationForm({ token, onSuccess }: { token: string, onSuccess: () =>
         const err = await res.json();
         alert(err.error || 'Failed to submit publication');
       }
-    } catch (err) {
-      alert('A network or upload error occurred.');
+    } catch (err: any) {
+      alert(err.message || 'A network or upload error occurred.');
     } finally {
       setIsSubmitting(false);
     }
