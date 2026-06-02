@@ -36,16 +36,16 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']  # Adjust for production
 
 # Security settings for production
+# SECURE_SSL_REDIRECT is disabled because the app is served on Railway's default
+# domain (*.up.railway.app) which does not have a valid SSL certificate for
+# Django's redirect target, causing an infinite HTTP 301 redirect loop.
+# Re-enable these settings only after attaching a custom domain with valid TLS.
+SECURE_SSL_REDIRECT = False
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 else:
     # Development settings
-    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
 
