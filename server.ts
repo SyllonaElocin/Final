@@ -11,8 +11,43 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import fs from 'fs';
 
-// Initialize db (Embedded Postgres simulating standard PostgreSQL connection)
-const db = new PGlite();
+import pg from 'pg';
+
+let db: {
+  query: (sql: string, params?: any[]) => Promise<{ rows: any[] }>;
+  exec: (sql: string) => Promise<void>;
+};
+
+const useSupabase = !!process.env.DATABASE_URL;
+
+if (useSupabase) {
+  console.log('Connecting to Supabase PostgreSQL Database...');
+  const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // Crucial for connection to hosted databases like Supabase
+  });
+  db = {
+    query: async (sql: string, params?: any[]) => {
+      const res = await pool.query(sql, params);
+      return { rows: res.rows };
+    },
+    exec: async (sql: string) => {
+      await pool.query(sql);
+    }
+  };
+} else {
+  console.log('Using local in-memory PGlite database.');
+  const pglite = new PGlite();
+  db = {
+    query: async (sql: string, params?: any[]) => {
+      const res = await pglite.query(sql, params);
+      return { rows: res.rows };
+    },
+    exec: async (sql: string) => {
+      await pglite.exec(sql);
+    }
+  };
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
