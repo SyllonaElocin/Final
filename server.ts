@@ -184,9 +184,9 @@ app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
         cloudinary.config({ secure: true });
       }
 
-      // Determine correct resource type: 'image' for standard images, 'raw' for PDFs/Datasets
-      const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext.toLowerCase());
-      const resourceType = isImage ? 'image' : 'raw';
+      // Determine correct resource type: 'image' for images and PDFs (so Cloudinary serves them as application/pdf), 'raw' for datasets (CSV, ZIP, etc.)
+      const isImageOrPdf = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'].includes(ext.toLowerCase());
+      const resourceType = isImageOrPdf ? 'image' : 'raw';
 
       const result = await cloudinary.uploader.upload(tempPath, {
         resource_type: resourceType
