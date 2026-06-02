@@ -4,4 +4,4 @@ providers = ["node", "python"]
 cmds = ["npm run build", "python manage.py collectstatic --noinput"]
 
 [start]
-cmd = "gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT"
+cmd = "gunicorn backend.wsgi:application --bind [::]:$PORT"
