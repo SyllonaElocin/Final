@@ -1,0 +1,8 @@
+{
+  "name": "Academic Research & Portfolio Repo",
+  "description": "Secure repository for academic publications and datasets with strict object-level permissions and JWT-based access control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
