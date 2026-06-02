@@ -131,7 +131,12 @@ app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
   const hasCloudinaryKeys = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
 
   if (hasCloudinaryUrl || hasCloudinaryKeys) {
+    const ext = path.extname(req.file.originalname);
+    const tempPath = req.file.path + ext;
     try {
+      // Rename file locally to preserve original extension for Cloudinary to detect properly
+      fs.renameSync(req.file.path, tempPath);
+
       const cloudinary = (await import('cloudinary')).v2;
       if (hasCloudinaryKeys) {
         cloudinary.config({
@@ -143,13 +148,20 @@ app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
       } else {
         cloudinary.config({ secure: true });
       }
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: 'auto'
+
+      // Determine correct resource type: 'image' for standard images, 'raw' for PDFs/Datasets
+      const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext.toLowerCase());
+      const resourceType = isImage ? 'image' : 'raw';
+
+      const result = await cloudinary.uploader.upload(tempPath, {
+        resource_type: resourceType
       });
-      fs.unlinkSync(req.file.path); // cleanup local
+
+      fs.unlinkSync(tempPath); // cleanup local
       return res.json({ url: result.secure_url });
     } catch (e: any) {
       console.error('Cloudinary Upload Error:', e);
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
       return res.status(500).json({ error: 'Cloudinary upload failed: ' + e.message });
     }
   }
