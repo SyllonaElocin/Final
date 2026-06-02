@@ -1,5 +1,5 @@
 {
-  "name": "Academic Research & Portfolio Repo",
+  "name": "Academic Repo",
   "description": "Secure repository for academic publications and datasets with strict object-level permissions and JWT-based access control.",
   "requestFramePermissions": [],
   "majorCapabilities": [

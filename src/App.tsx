@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import logo from './logo.png';
 import { BookOpen, FileText, Database, Shield, LogOut, CheckCircle2, User as UserIcon, Lock, Plus, Trash2, ShieldCheck, X, Quote, Copy, Check, Search } from 'lucide-react';
 import { User, Publication } from './types';
 import { cn } from './lib/utils';
@@ -66,11 +67,9 @@ export default function App() {
       {/* Navigation Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-indigo-700">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="font-bold text-xl tracking-tight text-slate-800">AcademicRepo</h1>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Academic Repo Logo" className="w-9 h-9 object-contain rounded-lg shadow-sm" />
+            <h1 className="font-bold text-xl tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">Academic Repo</h1>
           </div>
           
           <div className="flex items-center gap-4">
