@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import logo from './logo.png';
-import { BookOpen, FileText, Database, Shield, LogOut, CheckCircle2, User as UserIcon, Lock, Plus, Trash2, ShieldCheck, X, Quote, Copy, Check, Search } from 'lucide-react';
+import { BookOpen, FileText, Database, Shield, LogOut, CheckCircle2, User as UserIcon, Lock, Plus, Trash2, ShieldCheck, X, Quote, Copy, Check, Search, Edit2 } from 'lucide-react';
 import { User, Publication } from './types';
 import { cn } from './lib/utils';
 
@@ -124,7 +124,7 @@ export default function App() {
             }} 
           />
         ) : (
-          <RepositoryFeed publications={publications} user={user} />
+          <RepositoryFeed publications={publications} user={user} onUpdated={fetchPublications} />
         )}
       </main>
 
@@ -162,7 +162,7 @@ export default function App() {
 // Subcomponents
 // ------------------------------------
 
-function RepositoryFeed({ publications, user }: { publications: Publication[], user: User | null }) {
+function RepositoryFeed({ publications, user, onUpdated }: { publications: Publication[], user: User | null, onUpdated: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   if (publications.length === 0) {
@@ -220,7 +220,7 @@ function RepositoryFeed({ publications, user }: { publications: Publication[], u
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
           {filteredPubs.map((pub) => (
             <div key={pub.id}>
-              <PublicationCard pub={pub} user={user} />
+              <PublicationCard pub={pub} user={user} onUpdated={onUpdated} />
             </div>
           ))}
         </div>
@@ -229,13 +229,14 @@ function RepositoryFeed({ publications, user }: { publications: Publication[], u
   );
 }
 
-function PublicationCard({ pub, user }: { pub: Publication, user: User | null }) {
+function PublicationCard({ pub, user, onUpdated }: { pub: Publication, user: User | null, onUpdated: () => void }) {
   const isOwner = user?.id === pub.user_id;
   const isReviewer = user?.role === 'reviewer';
   const hasAccess = isOwner || isReviewer;
   
   const [showCite, setShowCite] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Derive co-authors text
   const authorsStr = pub.co_authors && pub.co_authors.length > 0 
@@ -265,12 +266,23 @@ function PublicationCard({ pub, user }: { pub: Publication, user: User | null })
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-3">
         <h3 className="text-lg font-bold text-slate-800 leading-tight">{pub.title}</h3>
-        {hasAccess && (
-          <span className="shrink-0 ml-4 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-            <CheckCircle2 className="h-3 w-3" />
-            Access Granted
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+            >
+              <Edit2 className="h-3 w-3" />
+              Edit
+            </button>
+          )}
+          {hasAccess && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="h-3 w-3" />
+              Access Granted
+            </span>
+          )}
+        </div>
       </div>
       
       <p className="text-sm text-indigo-600 font-medium mb-1">
@@ -332,6 +344,17 @@ function PublicationCard({ pub, user }: { pub: Publication, user: User | null })
           {new Date(pub.created_at).toLocaleDateString()}
         </span>
       </div>
+
+      {isEditing && (
+        <EditPublicationModal 
+          pub={pub} 
+          onClose={() => setIsEditing(false)} 
+          onUpdated={() => {
+            setIsEditing(false);
+            onUpdated();
+          }} 
+        />
+      )}
     </div>
   );
 }
@@ -591,6 +614,142 @@ function AuthDialog({ onAuth }: { onAuth: (view: 'login'|'register', data: any) 
             {mode === 'login' ? "Don't have an account? Register" : "Already have an account? Sign In"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Edit Publication Modal Component
+function EditPublicationModal({ pub, onClose, onUpdated }: { pub: Publication, onClose: () => void, onUpdated: () => void }) {
+  const [title, setTitle] = useState(pub.title);
+  const [abstract, setAbstract] = useState(pub.abstract);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [datasetFile, setDatasetFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const token = localStorage.getItem('token');
+
+  const uploadFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Upload failed');
+    }
+    const data = await res.json();
+    return data.url;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      let pdf_url = undefined;
+      let dataset_url = undefined;
+
+      if (pdfFile) pdf_url = await uploadFile(pdfFile);
+      if (datasetFile) dataset_url = await uploadFile(datasetFile);
+
+      const payload: any = { title, abstract };
+      if (pdf_url) payload.pdf_url = pdf_url;
+      if (dataset_url) payload.dataset_url = dataset_url;
+
+      const res = await fetch(`/api/publications/${pub.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        onUpdated();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update publication');
+      }
+    } catch (err: any) {
+      alert(err.message || 'A network or upload error occurred.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative border border-slate-100 my-8">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+          <X className="h-5 w-5" />
+        </button>
+        
+        <h2 className="text-xl font-bold mb-6 text-slate-800">Edit Publication</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Paper Title</label>
+              <input 
+                required
+                type="text" 
+                className="w-full border-slate-200 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm px-3 py-2 border"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Abstract</label>
+              <textarea 
+                required
+                rows={5}
+                className="w-full border-slate-200 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm px-3 py-2 border font-serif"
+                value={abstract}
+                onChange={e => setAbstract(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-bold tracking-tight text-slate-800 uppercase">Update Artifacts (Optional)</h3>
+            <p className="text-xs text-slate-500">Only upload files here if you want to replace the existing ones.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition cursor-pointer relative">
+                <input type="file" accept=".pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+                <FileText className="mx-auto h-6 w-6 text-slate-400 mb-2" />
+                <div className="text-sm font-medium text-indigo-600 mb-1">{pdfFile ? pdfFile.name : 'Replace PDF'}</div>
+              </div>
+              
+              <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition cursor-pointer relative bg-amber-50/30">
+                <input type="file" accept=".csv,.json,.zip" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => setDatasetFile(e.target.files?.[0] || null)} />
+                <Database className="mx-auto h-6 w-6 text-amber-500 mb-2" />
+                <div className="text-sm font-medium text-amber-600 mb-1">{datasetFile ? datasetFile.name : 'Replace Dataset'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
+            <button 
+              type="button" 
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="flex items-center gap-2 bg-indigo-600 text-white font-medium px-6 py-2.5 rounded-lg text-sm hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -324,6 +324,48 @@ app.post('/api/publications', async (req: any, res: any) => {
 });
 
 
+app.put('/api/publications/:id', async (req: any, res: any) => {
+  if (!req.user || req.user.role !== 'researcher') {
+    return res.status(403).json({ error: 'Strict Object-level permission: Only researchers can edit publications' });
+  }
+
+  const pubId = req.params.id;
+  const { title, abstract, pdf_url, dataset_url } = req.body;
+  if (!title || !abstract) return res.status(400).json({ error: 'Title and abstract are required' });
+
+  try {
+    // Verify ownership
+    const pubRes = await db.query(`SELECT user_id FROM publications WHERE id = $1`, [pubId]);
+    if (pubRes.rows.length === 0) return res.status(404).json({ error: 'Publication not found' });
+    if (pubRes.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Permission denied: You can only edit your own publications' });
+    }
+
+    // Update the record. We only update file URLs if they are provided, otherwise we leave them as is.
+    let updateQuery = `UPDATE publications SET title = $1, abstract = $2`;
+    let params: any[] = [title, abstract];
+    let paramIndex = 3;
+
+    if (pdf_url !== undefined) {
+      updateQuery += `, pdf_url = $${paramIndex++}`;
+      params.push(pdf_url);
+    }
+    if (dataset_url !== undefined) {
+      updateQuery += `, dataset_url = $${paramIndex++}`;
+      params.push(dataset_url);
+    }
+
+    updateQuery += ` WHERE id = $${paramIndex}`;
+    params.push(pubId);
+
+    await db.query(updateQuery, params);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 async function startServer() {
   try {
     console.log('[Server Startup] Initializing Database...');
