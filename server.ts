@@ -18,12 +18,22 @@ let db: {
   exec: (sql: string) => Promise<void>;
 };
 
-const useSupabase = !!process.env.DATABASE_URL;
+// Diagnostics to help identify available Railway/Supabase environment variables
+console.log('[Server Startup] Scanning Environment Variables for Database Configurations:');
+console.log('  - DATABASE_URL present:', !!process.env.DATABASE_URL);
+console.log('  - POSTGRES_URL present:', !!process.env.POSTGRES_URL);
+console.log('  - PGURL present:', !!process.env.PGURL);
+console.log('  - Found related Keys:', Object.keys(process.env).filter(k => 
+  k.includes('DB') || k.includes('URL') || k.includes('POSTGRES') || k.includes('PG')
+));
+
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGURL;
+const useSupabase = !!dbUrl;
 
 if (useSupabase) {
-  console.log('Connecting to Supabase PostgreSQL Database...');
+  console.log('Connecting to Supabase PostgreSQL Database using detected connection string...');
   const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: dbUrl,
     ssl: { rejectUnauthorized: false } // Crucial for connection to hosted databases like Supabase
   });
   db = {
