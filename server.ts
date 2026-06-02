@@ -127,14 +127,29 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/upload', upload.single('file'), async (req: any, res: any) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   
-  if (process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.startsWith('cloudinary://')) {
+  const hasCloudinaryUrl = process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.startsWith('cloudinary://');
+  const hasCloudinaryKeys = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
+
+  if (hasCloudinaryUrl || hasCloudinaryKeys) {
     try {
       const cloudinary = (await import('cloudinary')).v2;
-      cloudinary.config({ secure: true });
-      const result = await cloudinary.uploader.upload(req.file.path);
+      if (hasCloudinaryKeys) {
+        cloudinary.config({
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+          api_key: process.env.CLOUDINARY_API_KEY,
+          api_secret: process.env.CLOUDINARY_API_SECRET,
+          secure: true
+        });
+      } else {
+        cloudinary.config({ secure: true });
+      }
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: 'auto'
+      });
       fs.unlinkSync(req.file.path); // cleanup local
       return res.json({ url: result.secure_url });
     } catch (e: any) {
+      console.error('Cloudinary Upload Error:', e);
       return res.status(500).json({ error: 'Cloudinary upload failed: ' + e.message });
     }
   }
